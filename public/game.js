@@ -125,345 +125,309 @@
     const svg = document.getElementById('mapSvg');
     svg.innerHTML = '';
 
-    // --- Fondo cartográfico estilo mapa antiguo ---
+    // --- Definiciones SVG (gradientes, filtros, patrones) ---
     const defs = createSVG('defs', {});
 
-    // Gradiente para el océano
+    // Gradiente oceánico
     const oceanGrad = createSVG('radialGradient', {
-      id: 'oceanGradient', cx: '40%', cy: '40%', r: '70%'
+      id: 'oceanGrad', cx: '35%', cy: '35%', r: '75%'
     });
-    const stop1 = createSVG('stop', { offset: '0%', 'stop-color': '#d6eef8' });
-    const stop2 = createSVG('stop', { offset: '100%', 'stop-color': '#b4d8ec' });
-    oceanGrad.appendChild(stop1);
-    oceanGrad.appendChild(stop2);
+    [['0%','#2d6a9f'],['50%','#1e4d7a'],['100%','#1a3a5c']].forEach(([o,c]) => {
+      const s = createSVG('stop', { offset: o, 'stop-color': c });
+      oceanGrad.appendChild(s);
+    });
     defs.appendChild(oceanGrad);
 
-    // Patrón sutil de cuadrícula cartográfica
-    const gridPat = createSVG('pattern', {
-      id: 'gridPattern', width: 40, height: 40, patternUnits: 'userSpaceOnUse'
+    // Patrón de ruido/textura para la tierra
+    const noisePat = createSVG('pattern', {
+      id: 'noiseTexture', width: 100, height: 100, patternUnits: 'userSpaceOnUse'
     });
-    const gridLine1 = createSVG('line', {
-      x1: 0, y1: 0, x2: 40, y2: 0,
-      stroke: '#c2dce8', 'stroke-width': 0.3, opacity: 0.5
-    });
-    const gridLine2 = createSVG('line', {
-      x1: 0, y1: 0, x2: 0, y2: 40,
-      stroke: '#c2dce8', 'stroke-width': 0.3, opacity: 0.5
-    });
-    gridPat.appendChild(gridLine1);
-    gridPat.appendChild(gridLine2);
-    defs.appendChild(gridPat);
+    // Simular ruido con círculos aleatorios
+    for (let i = 0; i < 60; i++) {
+      const nc = createSVG('circle', {
+        cx: Math.random()*100, cy: Math.random()*100,
+        r: Math.random()*1.5+0.3,
+        fill: Math.random()>0.5 ? '#c4b49a' : '#a09070',
+        opacity: Math.random()*0.12+0.03,
+      });
+      noisePat.appendChild(nc);
+    }
+    defs.appendChild(noisePat);
+
+    // Filtro de sombra para vagones reclamados
+    const shadowFilter = createSVG('filter', { id: 'wagonShadow', x: '-20%', y: '-20%', width: '140%', height: '160%' });
+    const feOffset = createSVG('feOffset', { in: 'SourceAlpha', dx: 0, dy: 2, result: 'offOut' });
+    const feBlur = createSVG('feGaussianBlur', { in: 'offOut', stdDeviation: 2, result: 'blurOut' });
+    const feBlend = createSVG('feBlend', { in: 'SourceGraphic', in2: 'blurOut', mode: 'normal' });
+    shadowFilter.appendChild(feOffset);
+    shadowFilter.appendChild(feBlur);
+    shadowFilter.appendChild(feBlend);
+    defs.appendChild(shadowFilter);
+
+    // Gradientes de color para vagones de cada jugador
+    const playerGradColors = {
+      'rojo':    ['#f06060','#c03030'],
+      'azul':    ['#5dade2','#2471a3'],
+      'verde':   ['#58d68d','#1e8449'],
+      'amarillo':['#f7dc6f','#d4ac0d'],
+      'negro':   ['#5d6d7e','#2c3e50'],
+    };
+    for (const [pColor, [light, dark]] of Object.entries(playerGradColors)) {
+      const g = createSVG('linearGradient', { id: `grad_${pColor}`, x1:'0', y1:'0', x2:'0', y2:'1' });
+      g.appendChild(createSVG('stop', { offset: '0%', 'stop-color': light }));
+      g.appendChild(createSVG('stop', { offset: '100%', 'stop-color': dark }));
+      defs.appendChild(g);
+    }
+
     svg.appendChild(defs);
 
-    // Océano de fondo
-    const bg = createSVG('rect', {
-      x: 0, y: 0, width: 900, height: 650,
-      fill: 'url(#oceanGradient)'
-    });
-    svg.appendChild(bg);
+    // --- Océano ---
+    svg.appendChild(createSVG('rect', { x:0, y:0, width:900, height:650, fill:'url(#oceanGrad)' }));
 
-    // Cuadrícula cartográfica sobre el mar
-    const grid = createSVG('rect', {
-      x: 0, y: 0, width: 900, height: 650,
-      fill: 'url(#gridPattern)'
-    });
-    svg.appendChild(grid);
-
-    // Masas de tierra — polígonos de Europa simplificados
-    const landGroup = createSVG('g', { id: 'landMasses' });
-
-    // Escandinavia / Norte
-    const scandinavia = createSVG('path', {
-      d: `M430,20 L460,25 Q490,30 510,55 L520,80 Q525,100 510,120
-          L490,130 Q470,105 455,80 Q440,55 430,20 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(scandinavia);
-
-    // Islas Británicas
-    const britain = createSVG('path', {
-      d: `M165,95 Q175,85 195,90 L210,105 Q225,115 230,140
-          L240,170 Q250,195 245,215 L235,230 Q220,240 205,235
-          L190,220 Q180,200 175,175 Q170,150 168,125 L165,95 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(britain);
-
-    // Irlanda
-    const ireland = createSVG('path', {
-      d: `M140,145 Q150,135 165,140 L170,160 Q172,175 165,185
-          L155,190 Q142,185 138,170 L140,145 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(ireland);
-
-    // Europa continental principal
-    const continental = createSVG('path', {
-      d: `M230,220 Q260,210 290,205 L340,195 Q380,185 420,190
-          L480,185 Q530,175 580,165 L640,145 Q680,130 720,115
-          L760,105 Q800,100 840,115 L870,140 Q880,170 870,210
-          L860,260 Q850,300 840,340 L830,380 Q825,410 840,440
-          L850,470 Q845,500 820,510 L790,500 Q760,490 740,470
-          L720,460 Q700,455 680,460 L660,470 Q640,490 620,510
-          L600,530 Q580,540 560,535 L540,520 Q520,500 500,490
-          L480,480 Q460,475 440,480 L420,490 Q400,500 380,495
-          L360,480 Q340,470 320,460 L300,450 Q280,440 260,430
-          L240,420 Q220,400 210,375 L200,345 Q195,315 200,285
-          L210,260 Q220,240 230,220 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(continental);
-
-    // Península Ibérica
-    const iberia = createSVG('path', {
-      d: `M50,430 Q60,400 80,380 L110,370 Q140,365 170,370
-          L210,380 Q240,385 265,400 L285,420 Q295,440 290,465
-          L280,490 Q270,515 250,530 L220,540 Q190,550 160,545
-          L130,535 Q100,525 80,510 L60,490 Q45,465 50,430 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(iberia);
-
-    // Italia
-    const italy = createSVG('path', {
-      d: `M380,390 Q390,400 400,420 L410,445 Q420,470 430,490
-          L440,515 Q445,535 440,555 L435,570 Q425,580 415,575
-          L405,560 Q400,540 405,520 L400,500 Q390,480 380,460
-          L370,435 Q365,415 370,400 L380,390 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(italy);
-
-    // Sicilia
-    const sicily = createSVG('path', {
-      d: `M400,580 Q415,570 430,575 L440,585 Q435,600 420,605
-          L405,600 Q395,590 400,580 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(sicily);
-
-    // Grecia / Balcanes sur
-    const greece = createSVG('path', {
-      d: `M580,470 Q590,480 600,500 L610,520 Q615,540 605,555
-          L595,560 Q585,550 580,535 L575,510 Q572,490 580,470 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(greece);
-
-    // Turquía / Anatolia
-    const turkey = createSVG('path', {
-      d: `M680,410 Q710,405 740,410 L780,420 Q810,430 840,445
-          L860,460 Q870,475 860,490 L840,500 Q810,510 780,505
-          L750,500 Q720,495 700,485 L680,470 Q670,450 680,410 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(turkey);
-
-    // Rusia (parte visible)
-    const russia = createSVG('path', {
-      d: `M620,30 Q660,20 700,25 L750,40 Q800,55 840,80
-          L870,110 Q890,140 880,180 L870,210 Q860,180 840,160
-          L810,140 Q780,130 750,125 L710,120 Q680,118 650,110
-          L630,95 Q615,75 620,50 L620,30 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
-    });
-    landGroup.appendChild(russia);
-
-    // Norte de África (decorativo, borde inferior)
-    const africa = createSVG('path', {
-      d: `M0,620 Q50,600 120,610 L200,615 Q300,610 400,620
-          L500,625 Q600,620 700,630 L800,635 Q870,630 900,640
-          L900,650 L0,650 Z`,
-      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.5
-    });
-    landGroup.appendChild(africa);
-
-    svg.appendChild(landGroup);
-
-    // Líneas de latitud/longitud decorativas (más visibles sobre tierra)
-    const decoGroup = createSVG('g', { opacity: 0.15 });
-    for (let lat = 100; lat < 650; lat += 100) {
-      const latLine = createSVG('line', {
-        x1: 0, y1: lat, x2: 900, y2: lat,
-        stroke: '#8ba59a', 'stroke-width': 0.4, 'stroke-dasharray': '8 4'
-      });
-      decoGroup.appendChild(latLine);
+    // Cuadrícula cartográfica
+    const gridG = createSVG('g', { opacity: 0.08 });
+    for (let y = 0; y < 650; y += 50) {
+      gridG.appendChild(createSVG('line', { x1:0,y1:y,x2:900,y2:y, stroke:'#6a9fc0','stroke-width':0.4 }));
     }
-    for (let lon = 100; lon < 900; lon += 100) {
-      const lonLine = createSVG('line', {
-        x1: lon, y1: 0, x2: lon, y2: 650,
-        stroke: '#8ba59a', 'stroke-width': 0.4, 'stroke-dasharray': '8 4'
-      });
-      decoGroup.appendChild(lonLine);
+    for (let x = 0; x < 900; x += 50) {
+      gridG.appendChild(createSVG('line', { x1:x,y1:0,x2:x,y2:650, stroke:'#6a9fc0','stroke-width':0.4 }));
     }
-    svg.appendChild(decoGroup);
+    svg.appendChild(gridG);
 
-    // Rosa de los vientos decorativa (esquina inferior izquierda)
-    const compass = createSVG('text', {
-      x: 30, y: 635, 'font-size': '14px', fill: '#b8a88c',
-      'font-family': 'serif', 'font-style': 'italic', opacity: 0.6
+    // --- Masas de tierra ---
+    const landG = createSVG('g', { id: 'landMasses' });
+    const landStyle = { fill: '#e8dcc8', stroke: '#a09070', 'stroke-width': 1.5 };
+    const borderStyle = { fill: 'none', stroke: '#c4b49a', 'stroke-width': 0.8 };
+
+    // Polígonos de tierra
+    const lands = [
+      // Escandinavia
+      `M430,15 L465,22 Q500,30 515,60 L525,90 Q528,115 515,135 L495,145 Q475,120 460,90 Q445,55 430,15 Z`,
+      // Gran Bretaña
+      `M165,88 Q180,78 200,85 L215,100 Q230,112 235,140 L242,175 Q250,200 248,220 L238,235 Q222,245 208,238 L192,222 Q182,200 178,175 Q172,148 170,120 L165,88 Z`,
+      // Irlanda
+      `M138,140 Q150,130 168,138 L173,158 Q175,175 167,188 L157,193 Q143,186 139,168 L138,140 Z`,
+      // Europa continental
+      `M232,218 Q262,208 295,202 L345,192 Q388,182 425,188 L485,183 Q535,172 585,162 L645,142 Q685,128 725,112 L765,100 Q810,95 845,112 L875,138 Q888,170 878,215 L868,265 Q858,305 848,345 L838,385 Q832,418 848,448 L855,478 Q850,508 828,518 L795,508 Q765,498 745,478 L725,465 Q705,458 685,465 L665,478 Q645,498 625,518 L605,538 Q585,548 565,542 L545,528 Q525,508 505,498 L485,488 Q465,482 445,488 L425,498 Q405,508 385,502 L365,488 Q345,478 325,468 L305,458 Q285,448 265,438 L245,428 Q225,408 215,382 L205,350 Q198,318 205,288 L215,262 Q225,242 232,218 Z`,
+      // Iberia
+      `M48,428 Q58,395 82,375 L115,365 Q145,360 175,368 L215,378 Q245,385 270,402 L290,422 Q302,445 298,472 L288,498 Q278,522 255,538 L225,548 Q195,555 165,550 L132,542 Q102,530 82,515 L62,498 Q42,470 48,428 Z`,
+      // Italia
+      `M382,388 Q395,400 405,425 L415,452 Q425,478 435,498 L445,525 Q450,545 445,565 L440,578 Q428,588 418,582 L408,568 Q402,548 408,528 L405,508 Q395,488 385,468 L375,442 Q368,420 375,405 L382,388 Z`,
+      // Sicilia
+      `M402,585 Q418,575 435,580 L445,592 Q440,608 425,612 L408,607 Q398,598 402,585 Z`,
+      // Grecia
+      `M582,475 Q595,488 605,508 L615,528 Q620,548 610,562 L598,568 Q588,558 582,542 L578,518 Q575,498 582,475 Z`,
+      // Turquía
+      `M682,408 Q715,402 748,410 L785,425 Q818,438 845,452 L865,468 Q875,485 865,498 L845,508 Q815,518 785,512 L755,508 Q725,502 705,492 L685,478 Q672,458 682,408 Z`,
+      // Rusia
+      `M622,25 Q665,15 708,22 L758,38 Q808,55 845,82 L878,115 Q895,148 885,188 L878,218 Q868,188 848,168 L818,148 Q788,135 758,130 L718,125 Q688,122 658,115 L638,100 Q618,78 622,48 L622,25 Z`,
+      // Norte de África
+      `M0,625 Q55,605 125,615 L205,618 Q310,612 405,622 L505,628 Q605,622 705,632 L805,638 Q875,635 900,642 L900,650 L0,650 Z`,
+    ];
+    lands.forEach(d => {
+      landG.appendChild(createSVG('path', { d, ...landStyle }));
     });
-    compass.textContent = '🧭 N';
-    svg.appendChild(compass);
 
-    // Grupo de rutas (debajo de ciudades)
-    const routeGroup = createSVG('g', { id: 'routeGroup' });
-    svg.appendChild(routeGroup);
+    // Textura de ruido sobre la tierra
+    landG.appendChild(createSVG('rect', { x:0,y:0,width:900,height:650, fill:'url(#noiseTexture)', opacity:0.15 }));
 
-    // Grupo de estaciones
-    const stationGroup = createSVG('g', { id: 'stationGroup' });
-    svg.appendChild(stationGroup);
+    // Bordes de países (aproximados)
+    const borders = [
+      // Francia-España (Pirineos)
+      'M185,388 Q210,378 240,385',
+      // Francia-Alemania
+      'M340,260 Q360,280 375,300',
+      // Francia-Italia
+      'M352,345 Q368,365 375,388',
+      // Alemania-Polonia
+      'M482,188 Q490,210 495,235 L498,268',
+      // Austria-Hungría
+      'M505,318 Q525,328 548,338',
+      // Balcanes
+      'M502,388 Q520,395 538,405 Q558,415 575,428',
+      // Italia-Balcanes
+      'M465,385 Q478,392 488,402',
+    ];
+    borders.forEach(d => {
+      landG.appendChild(createSVG('path', { d, ...borderStyle, 'stroke-dasharray': '4 3' }));
+    });
+    svg.appendChild(landG);
 
-    // Grupo de ciudades (encima)
-    const cityGroup = createSVG('g', { id: 'cityGroup' });
-    svg.appendChild(cityGroup);
+    // --- Iconos de montañas ---
+    const mtG = createSVG('g', { id: 'mountains', opacity: 0.35 });
+    const mountainPositions = [
+      // Alpes
+      [378,340],[395,330],[412,335],[390,345],
+      // Pirineos
+      [195,395],[210,392],[225,398],
+      // Cárpatos
+      [558,310],[572,318],[585,325],
+      // Balcanes
+      [535,440],[548,435],[522,448],
+    ];
+    mountainPositions.forEach(([mx,my]) => {
+      const mt = createSVG('path', {
+        d: `M${mx-6},${my+4} L${mx},${my-6} L${mx+6},${my+4} Z`,
+        fill: 'none', stroke: '#8a7a6a', 'stroke-width': 1, 'stroke-linejoin': 'round'
+      });
+      mtG.appendChild(mt);
+    });
+    svg.appendChild(mtG);
+
+    // --- Etiquetas de mar ---
+    const seaLabels = [
+      [120,310,'Mar del Norte',11,-15], [80,580,'Océano\nAtlántico',10,0],
+      [450,600,'Mar Mediterráneo',11,0], [680,350,'Mar Negro',9,0],
+      [590,155,'Mar Báltico',8,-10],
+    ];
+    const seaG = createSVG('g', { opacity: 0.4 });
+    seaLabels.forEach(([sx,sy,txt,fs,rot]) => {
+      const st = createSVG('text', {
+        x:sx, y:sy, 'font-size':`${fs}px`, fill:'#7ab0d4',
+        'font-family': "'Crimson Text', serif", 'font-style':'italic',
+        'text-anchor':'middle', transform: rot ? `rotate(${rot} ${sx} ${sy})` : ''
+      });
+      st.textContent = txt;
+      seaG.appendChild(st);
+    });
+    svg.appendChild(seaG);
+
+    // --- Rosa de los vientos ---
+    const compassG = createSVG('g', { transform: 'translate(42,610)', opacity: 0.5 });
+    // Círculo exterior
+    compassG.appendChild(createSVG('circle', { cx:0,cy:0,r:16, fill:'none', stroke:'#a09070','stroke-width':1 }));
+    // Flechas N/S/E/O
+    compassG.appendChild(createSVG('path', { d:'M0,-14 L3,-4 L0,-6 L-3,-4 Z', fill:'#c03030' })); // N roja
+    compassG.appendChild(createSVG('path', { d:'M0,14 L3,4 L0,6 L-3,4 Z', fill:'#a09070' }));
+    compassG.appendChild(createSVG('path', { d:'M14,0 L4,3 L6,0 L4,-3 Z', fill:'#a09070' }));
+    compassG.appendChild(createSVG('path', { d:'M-14,0 L-4,3 L-6,0 L-4,-3 Z', fill:'#a09070' }));
+    const nLabel = createSVG('text', { x:0,y:-18, 'font-size':'7px', fill:'#a09070', 'text-anchor':'middle', 'font-family':'serif' });
+    nLabel.textContent = 'N';
+    compassG.appendChild(nLabel);
+    svg.appendChild(compassG);
+
+    // --- Escala visual ---
+    const scaleG = createSVG('g', { transform: 'translate(820,630)', opacity: 0.4 });
+    scaleG.appendChild(createSVG('line', { x1:0,y1:0,x2:50,y2:0, stroke:'#a09070','stroke-width':1.5 }));
+    scaleG.appendChild(createSVG('line', { x1:0,y1:-3,x2:0,y2:3, stroke:'#a09070','stroke-width':1 }));
+    scaleG.appendChild(createSVG('line', { x1:50,y1:-3,x2:50,y2:3, stroke:'#a09070','stroke-width':1 }));
+    const scaleTxt = createSVG('text', { x:25,y:10, 'font-size':'6px', fill:'#a09070', 'text-anchor':'middle', 'font-family':'serif' });
+    scaleTxt.textContent = '500 km';
+    scaleG.appendChild(scaleTxt);
+    svg.appendChild(scaleG);
+
+    // --- Grupos de elementos del juego ---
+    svg.appendChild(createSVG('g', { id: 'routeGroup' }));
+    svg.appendChild(createSVG('g', { id: 'stationGroup' }));
+    svg.appendChild(createSVG('g', { id: 'cityGroup' }));
 
     // Dibujar rutas
-    for (const route of ROUTES) {
-      drawRoute(routeGroup, route);
-    }
+    const routeGroup = document.getElementById('routeGroup');
+    for (const route of ROUTES) { drawRoute(routeGroup, route); }
 
     // Dibujar ciudades
-    for (const [name, pos] of Object.entries(CITIES)) {
-      drawCity(cityGroup, name, pos);
-    }
+    const cityGroup = document.getElementById('cityGroup');
+    for (const [name, pos] of Object.entries(CITIES)) { drawCity(cityGroup, name, pos); }
 
     updateMapClaims();
   }
 
+  // Calcular offset para rutas dobles
+  function getRouteOffset(route) {
+    const c1 = CITIES[route.cities[0]], c2 = CITIES[route.cities[1]];
+    const dx = c2.x - c1.x, dy = c2.y - c1.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const nx = -dy/len, ny = dx/len;
+    if (route.double) return { x: nx*5, y: ny*5 };
+    const hasDouble = ROUTES.some(r =>
+      r.id !== route.id && r.double &&
+      ((r.cities[0]===route.cities[0] && r.cities[1]===route.cities[1]) ||
+       (r.cities[0]===route.cities[1] && r.cities[1]===route.cities[0]))
+    );
+    if (hasDouble) return { x: -nx*5, y: -ny*5 };
+    return { x:0, y:0 };
+  }
+
   function drawRoute(group, route) {
-    const c1 = CITIES[route.cities[0]];
-    const c2 = CITIES[route.cities[1]];
+    const c1 = CITIES[route.cities[0]], c2 = CITIES[route.cities[1]];
     if (!c1 || !c2) return;
 
-    // Offset para rutas dobles
-    let offsetX = 0, offsetY = 0;
-    if (route.double) {
-      const dx = c2.x - c1.x;
-      const dy = c2.y - c1.y;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      const nx = -dy / len;
-      const ny = dx / len;
-      offsetX = nx * 5;
-      offsetY = ny * 5;
-    } else {
-      // Verificar si tiene paralela y mover esta también
-      const hasDouble = ROUTES.some(r =>
-        r.id !== route.id && r.double &&
-        ((r.cities[0] === route.cities[0] && r.cities[1] === route.cities[1]) ||
-         (r.cities[0] === route.cities[1] && r.cities[1] === route.cities[0]))
-      );
-      if (hasDouble) {
-        const dx = c2.x - c1.x;
-        const dy = c2.y - c1.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        const nx = -dy / len;
-        const ny = dx / len;
-        offsetX = -nx * 5;
-        offsetY = -ny * 5;
-      }
-    }
-
-    const x1 = c1.x + offsetX;
-    const y1 = c1.y + offsetY;
-    const x2 = c2.x + offsetX;
-    const y2 = c2.y + offsetY;
-
-    // Dibujar segmentos de vagón a lo largo de la ruta
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const totalLen = Math.sqrt(dx * dx + dy * dy);
+    const off = getRouteOffset(route);
+    const x1 = c1.x+off.x, y1 = c1.y+off.y, x2 = c2.x+off.x, y2 = c2.y+off.y;
+    const dx = x2-x1, dy = y2-y1;
+    const totalLen = Math.sqrt(dx*dx + dy*dy);
     const segLen = totalLen / route.length;
-    const ux = dx / totalLen;
-    const uy = dy / totalLen;
-
+    const ux = dx/totalLen, uy = dy/totalLen;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     const routeColor = CARD_COLORS_VIS[route.color] || '#7f8c8d';
 
-    // Grupo de la ruta completa
     const routeG = createSVG('g', {
-      id: `route-${route.id}`,
-      class: 'route-group',
-      'data-route-id': route.id,
-      cursor: 'pointer',
+      id: `route-${route.id}`, class: 'route-group',
+      'data-route-id': route.id, cursor: 'pointer',
     });
 
-    // Línea de fondo (para clickeo más fácil)
-    const bgLine = createSVG('line', {
-      x1, y1, x2, y2,
-      stroke: 'transparent',
-      'stroke-width': 16,
-      class: 'route-hitarea',
-    });
-    routeG.appendChild(bgLine);
+    // Hitarea invisible
+    routeG.appendChild(createSVG('line', {
+      x1,y1,x2,y2, stroke:'transparent', 'stroke-width':16, class:'route-hitarea'
+    }));
 
-    // Segmentos de vagón
+    // Segmentos de vagón no reclamados (punteados)
     for (let i = 0; i < route.length; i++) {
-      const startX = x1 + ux * (i * segLen + 2);
-      const startY = y1 + uy * (i * segLen + 2);
-      const endX = x1 + ux * ((i + 1) * segLen - 2);
-      const endY = y1 + uy * ((i + 1) * segLen - 2);
-
-      const midX = (startX + endX) / 2;
-      const midY = (startY + endY) / 2;
-      const wLen = segLen - 4;
-      const wHeight = 7;
-      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      const midX = x1 + ux * ((i+0.5) * segLen);
+      const midY = y1 + uy * ((i+0.5) * segLen);
+      const wLen = segLen - 4, wH = 7;
 
       const wagon = createSVG('rect', {
-        x: midX - wLen / 2,
-        y: midY - wHeight / 2,
-        width: wLen,
-        height: wHeight,
-        rx: 3, ry: 3,
-        fill: routeColor,
-        stroke: 'rgba(0,0,0,0.2)',
-        'stroke-width': 1,
-        opacity: 0.5,
+        x: midX - wLen/2, y: midY - wH/2, width: wLen, height: wH,
+        rx: 3, ry: 3, fill: routeColor, stroke: 'rgba(255,255,255,0.15)',
+        'stroke-width': 0.8, opacity: 0.35,
         transform: `rotate(${angle} ${midX} ${midY})`,
-        class: 'route-wagon',
-        'data-route-id': route.id,
-        'data-segment': i,
+        class: 'route-wagon', 'data-route-id': route.id, 'data-segment': i,
       });
       routeG.appendChild(wagon);
     }
 
-    // Marcador de tipo (túnel/ferry)
+    // Marcador túnel/ferry
     if (route.type === 'tunnel' || route.type === 'ferry') {
-      const midX = (x1 + x2) / 2;
-      const midY = (y1 + y2) / 2;
-      const label = route.type === 'tunnel' ? '⛰' : '⚓';
+      const mx = (x1+x2)/2, my = (y1+y2)/2;
       const marker = createSVG('text', {
-        x: midX,
-        y: midY - 8,
-        class: route.type === 'tunnel' ? 'tunnel-marker' : 'ferry-marker',
-        'font-size': '9px',
-        'text-anchor': 'middle',
+        x:mx, y:my-9, class: route.type==='tunnel'?'tunnel-marker':'ferry-marker',
+        'font-size':'8px', 'text-anchor':'middle',
       });
-      marker.textContent = label;
+      marker.textContent = route.type==='tunnel' ? '⛰' : '⚓';
       routeG.appendChild(marker);
     }
 
-    // Evento click en ruta
     routeG.addEventListener('click', () => onRouteClick(route));
-
     group.appendChild(routeG);
   }
 
   function drawCity(group, name, pos) {
-    // Círculo de la ciudad
+    // Círculo exterior (borde) + interior (relleno oscuro)
+    const outerDot = createSVG('circle', {
+      cx: pos.x, cy: pos.y, r: 6.5,
+      fill: '#e8dcc8', stroke: '#a09070', 'stroke-width': 1,
+      filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+    });
+    group.appendChild(outerDot);
+
     const dot = createSVG('circle', {
-      cx: pos.x, cy: pos.y, r: 6,
-      class: 'city-dot',
-      'data-city': name,
+      cx: pos.x, cy: pos.y, r: 4.5,
+      class: 'city-dot', 'data-city': name,
     });
     dot.addEventListener('click', () => onCityClick(name));
     group.appendChild(dot);
 
-    // Etiqueta
+    // Etiqueta con fondo pastilla
+    const labelBg = createSVG('rect', {
+      x: pos.x - name.length*2.5 - 3, y: pos.y - 19,
+      width: name.length*5 + 6, height: 11,
+      rx: 3, ry: 3, fill: 'rgba(0,0,0,0.55)',
+    });
+    group.appendChild(labelBg);
+
     const label = createSVG('text', {
-      x: pos.x,
-      y: pos.y - 10,
-      class: 'city-label',
+      x: pos.x, y: pos.y - 11, class: 'city-label',
     });
     label.textContent = name;
     group.appendChild(label);
@@ -472,30 +436,79 @@
   function updateMapClaims() {
     if (!gameState) return;
 
-    // Actualizar vagones reclamados
+    // Actualizar vagones reclamados con diseño 3D detallado
     for (const route of ROUTES) {
       const routeG = document.getElementById(`route-${route.id}`);
       if (!routeG) continue;
 
       const claimedBy = gameState.claimedRoutes[route.id];
-      const wagons = routeG.querySelectorAll('.route-wagon');
+      if (!claimedBy) continue;
+      if (routeG.dataset.claimedRendered) continue; // Ya renderizado
 
-      if (claimedBy) {
-        // Encontrar color del jugador
-        const player = gameState.players.find(p => p.id === claimedBy);
-        const playerColor = player ? PLAYER_COLORS_VIS[player.color] : '#666';
+      const player = gameState.players.find(p => p.id === claimedBy);
+      if (!player) continue;
+      const pColor = player.color; // rojo, azul, etc.
+      const gradId = `grad_${pColor}`;
 
-        wagons.forEach((w, i) => {
-          w.setAttribute('fill', playerColor);
-          w.setAttribute('opacity', '1');
-          w.setAttribute('stroke', 'rgba(255,255,255,0.6)');
-          w.setAttribute('stroke-width', '2');
-          if (!w.classList.contains('claimed')) {
-            w.classList.add('claimed', 'wagon-animate');
-            w.style.animationDelay = `${i * 0.1}s`;
-          }
+      // Eliminar vagones planos originales
+      routeG.querySelectorAll('.route-wagon').forEach(w => w.remove());
+
+      // Calcular posiciones de los vagones
+      const c1 = CITIES[route.cities[0]], c2 = CITIES[route.cities[1]];
+      if (!c1 || !c2) continue;
+      const off = getRouteOffset(route);
+      const x1 = c1.x+off.x, y1 = c1.y+off.y, x2 = c2.x+off.x, y2 = c2.y+off.y;
+      const dx = x2-x1, dy = y2-y1;
+      const totalLen = Math.sqrt(dx*dx + dy*dy);
+      const segLen = totalLen / route.length;
+      const ux = dx/totalLen, uy = dy/totalLen;
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      const wLen = Math.min(segLen - 3, 32);
+      const wH = 14;
+
+      for (let i = 0; i < route.length; i++) {
+        const cx = x1 + ux * ((i+0.5) * segLen);
+        const cy = y1 + uy * ((i+0.5) * segLen);
+
+        // Grupo del vagón individual
+        const wg = createSVG('g', {
+          transform: `translate(${cx},${cy}) rotate(${angle})`,
+          class: 'wagon-animate', style: `animation-delay:${i*0.1}s`,
+          filter: 'url(#wagonShadow)',
         });
+
+        // Cuerpo del vagón con degradado
+        wg.appendChild(createSVG('rect', {
+          x: -wLen/2, y: -wH/2, width: wLen, height: wH, rx: 3, ry: 3,
+          fill: `url(#${gradId})`, stroke: 'rgba(255,255,255,0.3)', 'stroke-width': 0.8,
+        }));
+
+        // Línea divisoria horizontal
+        wg.appendChild(createSVG('line', {
+          x1: -wLen/2+2, y1: 1, x2: wLen/2-2, y2: 1,
+          stroke: 'rgba(0,0,0,0.15)', 'stroke-width': 0.5,
+        }));
+
+        // Ventanitas
+        const winW = Math.min(6, wLen/5), winH = 4;
+        wg.appendChild(createSVG('rect', {
+          x: -wLen/4-winW/2, y: -wH/2+2, width: winW, height: winH, rx: 1,
+          fill: 'rgba(255,255,255,0.4)',
+        }));
+        wg.appendChild(createSVG('rect', {
+          x: wLen/4-winW/2, y: -wH/2+2, width: winW, height: winH, rx: 1,
+          fill: 'rgba(255,255,255,0.4)',
+        }));
+
+        // Ruedas
+        const wheelR = 2.5;
+        wg.appendChild(createSVG('circle', { cx: -wLen/4, cy: wH/2+1, r: wheelR, fill: '#1a1a2e', stroke:'#333','stroke-width':0.5 }));
+        wg.appendChild(createSVG('circle', { cx: wLen/4, cy: wH/2+1, r: wheelR, fill: '#1a1a2e', stroke:'#333','stroke-width':0.5 }));
+
+        routeG.appendChild(wg);
       }
+
+      routeG.dataset.claimedRendered = 'true';
     }
 
     // Actualizar estaciones
@@ -508,12 +521,10 @@
           if (!station.city || !CITIES[station.city]) continue;
           const pos = CITIES[station.city];
           const marker = createSVG('rect', {
-            x: pos.x - 5, y: pos.y + 8,
-            width: 10, height: 10,
-            rx: 2, ry: 2,
+            x: pos.x - 5, y: pos.y + 10,
+            width: 10, height: 10, rx: 2, ry: 2,
             fill: PLAYER_COLORS_VIS[player.color],
-            stroke: '#fff',
-            'stroke-width': 1.5,
+            stroke: 'rgba(255,255,255,0.5)', 'stroke-width': 1.5,
             class: 'station-marker',
           });
           stationGroup.appendChild(marker);
@@ -997,15 +1008,15 @@
 
         <p style="margin-bottom:0.8rem; color:var(--text-dim)">En tu turno debes elegir <strong>UNA</strong> de estas acciones:</p>
 
-        <div style="background:var(--bg-card); border:2px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
-          <strong style="color:var(--sky)">🃏 ROBAR CARTAS DE VAGON</strong><br>
+        <div style="background:rgba(15,52,96,0.5); border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
+          <strong style="color:#5dade2">🃏 ROBAR CARTAS DE VAGON</strong><br>
           Coge 2 cartas: del mazo (ciegas) o de las 5 cartas visibles.<br>
           Si coges una Locomotora visible, solo puedes coger esa (cuenta como 2).<br>
           Las locomotoras son comodin para cualquier color.
         </div>
 
-        <div style="background:var(--bg-card); border:2px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
-          <strong style="color:var(--accent)">🚂 RECLAMAR UNA RUTA</strong><br>
+        <div style="background:rgba(15,52,96,0.5); border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
+          <strong style="color:#e94560">🚂 RECLAMAR UNA RUTA</strong><br>
           Haz clic en una ruta del mapa para reclamarla.<br>
           Necesitas tantas cartas del color de la ruta como segmentos tenga.<br>
           Las rutas grises aceptan cualquier color (todos iguales).<br>
@@ -1013,14 +1024,14 @@
           Rutas con ⛰ (tunel): pueden requerir cartas extra (se revelan 3 del mazo).
         </div>
 
-        <div style="background:var(--bg-card); border:2px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
-          <strong style="color:var(--gold)">🎫 ROBAR BILLETES DE DESTINO</strong><br>
+        <div style="background:rgba(15,52,96,0.5); border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
+          <strong style="color:#f0b429">🎫 ROBAR BILLETES DE DESTINO</strong><br>
           Roba 3 billetes y quedate al menos 1.<br>
           Completar un billete da puntos; no completarlo resta puntos.
         </div>
 
-        <div style="background:var(--bg-card); border:2px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
-          <strong style="color:var(--pink)">🏠 COLOCAR ESTACION</strong> (opcional)<br>
+        <div style="background:rgba(15,52,96,0.5); border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
+          <strong style="color:#e084a0">🏠 COLOCAR ESTACION</strong> (opcional)<br>
           Haz clic en una ciudad para colocar una estacion.<br>
           Te permite usar UNA ruta adyacente de otro jugador.<br>
           Cada estacion no usada al final da 4 puntos extra.
