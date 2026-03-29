@@ -339,7 +339,10 @@ input[type="text"]::placeholder { color: var(--text-muted); }
 .results-table tr:first-child td { color:var(--gold); font-weight:600; }
 .results-table .total-col { font-weight:600; font-size:1rem; }
 
-/* Animaciones vagones */
+/* Vagones reclamados — visibles siempre, sin depender de animación */
+.claimed-wagon { opacity: 1; }
+
+/* Animación solo para la primera aparición (no se usa en re-renders) */
 @keyframes trainPlace { 0%{transform:scale(0);opacity:0} 60%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
 .wagon-animate { animation:trainPlace 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards; }
 

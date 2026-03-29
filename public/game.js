@@ -390,7 +390,7 @@
 
         const wg = createSVG('g', {
           transform: `translate(${cx},${cy}) rotate(${angle})`,
-          class: 'wagon-animate', style: `animation-delay:${i*0.08}s`,
+          class: 'claimed-wagon',
           filter: 'url(#wShadow)',
         });
 
