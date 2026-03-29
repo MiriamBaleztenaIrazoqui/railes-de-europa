@@ -168,11 +168,11 @@
     if (oldSvg) oldSvg.remove();
     container.appendChild(mapDiv);
 
-    // Inicializar Leaflet — zoom 5 centrado en Europa, interactivo
+    // Inicializar Leaflet — centrado en Europa para ver todas las ciudades
     leafletMap = L.map('leaflet-map', {
-      center: [50, 15],
-      zoom: 5,
-      minZoom: 4,
+      center: [48, 14],          // Centrar más al oeste y sur para ver Lisboa
+      zoom: 4,                   // Zoom 4 para ver toda Europa incluido Lisboa y Moscú
+      minZoom: 3,
       maxZoom: 7,
       zoomControl: true,
       attributionControl: true,
@@ -184,8 +184,8 @@
       keyboard: false,
     });
 
-    // Limitar vista a Europa
-    leafletMap.setMaxBounds(L.latLngBounds(L.latLng(34, -12), L.latLng(72, 45)));
+    // Limitar vista a Europa — extender más al sur y oeste para Lisboa
+    leafletMap.setMaxBounds(L.latLngBounds(L.latLng(30, -15), L.latLng(72, 48)));
 
     // Tiles CartoDB Positron (fondo claro elegante)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -420,7 +420,7 @@
     }
   }
 
-  // --- Dibujar estaciones ---
+  // --- Dibujar estaciones colocadas (icono de casa visible) ---
   function renderStations(stationGroup) {
     if (!gameState) return;
     for (const player of gameState.players) {
@@ -428,13 +428,38 @@
       for (const station of player.placedStations) {
         if (!station.city || !GEO_CITIES[station.city]) continue;
         const p = geoToPixel(station.city);
-        const marker = createSVG('rect', {
-          x:p.x-4, y:p.y+9, width:8, height:8, rx:2, ry:2,
-          fill: PLAYER_COLORS_VIS[player.color],
-          stroke:'#fff', 'stroke-width':1.5,
-          class:'station-marker',
+        const color = PLAYER_COLORS_VIS[player.color] || '#888';
+
+        // Grupo de la estación
+        const sg = createSVG('g', {
+          transform: `translate(${p.x}, ${p.y + 12})`,
+          class: 'station-placed',
         });
-        stationGroup.appendChild(marker);
+
+        // Base de la casa (cuadrado)
+        sg.appendChild(createSVG('rect', {
+          x: -6, y: -4, width: 12, height: 10, rx: 1,
+          fill: color, stroke: '#fff', 'stroke-width': 1.5,
+        }));
+
+        // Techo (triángulo)
+        const roof = createSVG('polygon', {
+          points: '-8,-4 0,-11 8,-4',
+          fill: color, stroke: '#fff', 'stroke-width': 1.5,
+          'stroke-linejoin': 'round',
+        });
+        sg.appendChild(roof);
+
+        // Puerta
+        sg.appendChild(createSVG('rect', {
+          x: -2, y: 1, width: 4, height: 5, rx: 0.5,
+          fill: 'rgba(255,255,255,0.6)',
+        }));
+
+        // Sombra
+        sg.setAttribute('filter', 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))');
+
+        stationGroup.appendChild(sg);
       }
     }
   }
@@ -445,16 +470,23 @@
 
     // Círculo exterior
     group.appendChild(createSVG('circle', {
-      cx:p.x, cy:p.y, r:6, fill:'#e8dcc8', stroke:'#a09070', 'stroke-width':1,
+      cx:p.x, cy:p.y, r:7, fill:'#e8dcc8', stroke:'#a09070', 'stroke-width':1.5,
       filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
     }));
 
-    // Círculo interior (interactivo)
+    // Círculo interior (interactivo) — radio 5 para ser más fácil de clicar
     const dot = createSVG('circle', {
-      cx:p.x, cy:p.y, r:4, class:'city-dot', 'data-city':name, cursor:'pointer',
+      cx:p.x, cy:p.y, r:5, class:'city-dot', 'data-city':name, cursor:'pointer',
     });
     dot.addEventListener('click', () => onCityClick(name));
     group.appendChild(dot);
+
+    // Hitarea invisible grande para facilitar clic en estaciones
+    const hitarea = createSVG('circle', {
+      cx:p.x, cy:p.y, r:12, fill:'transparent', cursor:'pointer',
+    });
+    hitarea.addEventListener('click', () => onCityClick(name));
+    group.appendChild(hitarea);
 
     // Etiqueta con fondo
     const labelBg = createSVG('rect', {
