@@ -15,6 +15,7 @@
   let leafletMap = null;
   let svgOverlay = null;
   let helpShownOnce = false;
+  let initialTicketsChosen = false; // No mostrar ayuda hasta que se elijan billetes
 
   // Coordenadas geográficas reales de las ciudades
   const GEO_CITIES = {
@@ -494,10 +495,10 @@
     if (current.id === myId) {
       text.textContent = '¡Tu turno!';
       banner.classList.add('your-turn-glow');
-      // Popup de ayuda automático la primera vez
-      if (!helpShownOnce && !gameState.turnPhase) {
+      // Popup de ayuda automático la primera vez (solo después de elegir billetes)
+      if (!helpShownOnce && !gameState.turnPhase && initialTicketsChosen) {
         helpShownOnce = true;
-        setTimeout(() => showHelpModal(), 600);
+        setTimeout(() => showHelpModal(), 400);
       }
     } else {
       text.textContent = `Turno de ${current.name}`;
@@ -697,6 +698,7 @@
     document.querySelectorAll('.modal-ticket input[type="checkbox"]').forEach(cb => { if(cb.checked) kept.push(parseInt(cb.dataset.idx)); });
     if (kept.length < 2) return showToast('Debes conservar al menos 2 billetes');
     socket.emit('chooseInitialTickets', { kept });
+    initialTicketsChosen = true;
     hideModal();
   };
 
