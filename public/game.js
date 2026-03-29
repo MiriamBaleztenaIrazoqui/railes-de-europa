@@ -122,6 +122,8 @@
     privateState = state;
     updateHandUI();
     updateTicketsUI();
+    // También actualizar cartas visibles si tenemos gameState (por si llega antes del gameState)
+    if (gameState) updateFaceUpCards();
   });
 
   socket.on('gameStarted', (data) => {
@@ -166,19 +168,24 @@
     if (oldSvg) oldSvg.remove();
     container.appendChild(mapDiv);
 
-    // Inicializar Leaflet
+    // Inicializar Leaflet — zoom 5 centrado en Europa, interactivo
     leafletMap = L.map('leaflet-map', {
       center: [50, 15],
-      zoom: 4,
-      zoomControl: false,
+      zoom: 5,
+      minZoom: 4,
+      maxZoom: 7,
+      zoomControl: true,
       attributionControl: true,
-      dragging: false,
-      scrollWheelZoom: false,
+      dragging: true,
+      scrollWheelZoom: true,
       doubleClickZoom: false,
-      touchZoom: false,
+      touchZoom: true,
       boxZoom: false,
       keyboard: false,
     });
+
+    // Limitar vista a Europa
+    leafletMap.setMaxBounds(L.latLngBounds(L.latLng(34, -12), L.latLng(72, 45)));
 
     // Tiles CartoDB Positron (fondo claro elegante)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -218,7 +225,8 @@
       renderSVGOverlay();
     });
 
-    leafletMap.on('resize', () => { renderSVGOverlay(); });
+    // Re-renderizar SVG cuando el mapa cambie (zoom, drag, resize)
+    leafletMap.on('moveend zoomend resize', () => { renderSVGOverlay(); });
   }
 
   // Renderizar todo el contenido SVG sobre el mapa Leaflet
@@ -345,6 +353,10 @@
   // --- Dibujar vagones reclamados con detalle 3D ---
   function renderClaimedWagons(routeGroup) {
     if (!gameState) return;
+    const claimedIds = Object.keys(gameState.claimedRoutes);
+    if (claimedIds.length > 0) {
+      console.log('[VAGONES] Renderizando', claimedIds.length, 'rutas reclamadas:', claimedIds.join(', '));
+    }
 
     for (const route of ROUTES) {
       const claimedBy = gameState.claimedRoutes[route.id];
@@ -473,8 +485,9 @@
     updateChatUI();
     updateDeckCounts();
     updateStationsInfo();
-    // Re-renderizar SVG overlay (actualiza vagones reclamados)
+    // Re-renderizar SVG completo (incluye vagones reclamados y estaciones)
     renderSVGOverlay();
+    console.log('[UI] updateUI completo. Rutas reclamadas:', Object.keys(gameState.claimedRoutes).length);
   }
 
   function updateTurnBanner() {
