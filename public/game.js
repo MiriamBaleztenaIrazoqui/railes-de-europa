@@ -79,11 +79,11 @@
     'negro':   ['#7a7a7a','#3a3a3a'],
   };
 
-  // --- Convertir coordenadas geográficas a píxeles del mapa Leaflet ---
+  // --- Convertir coordenadas geográficas a píxeles del contenedor ---
   function geoToPixel(name) {
     const geo = GEO_CITIES[name];
-    if (!geo || !leafletMap) return { x: 0, y: 0 };
-    const pt = leafletMap.latLngToLayerPoint([geo.lat, geo.lng]);
+    if (!geo || !leafletMap) { console.warn('[GEO] No geo/map para:', name); return { x: 0, y: 0 }; }
+    const pt = leafletMap.latLngToContainerPoint([geo.lat, geo.lng]);
     return { x: pt.x, y: pt.y };
   }
 
@@ -186,21 +186,20 @@
       maxZoom: 19,
     }).addTo(leafletMap);
 
-    // Crear SVG overlay encima del mapa
+    // Crear SVG overlay DIRECTAMENTE en el contenedor del mapa (no en overlayPane)
+    // Así usamos containerPoint y no hay offset de panes
     svgOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svgOverlay.setAttribute('id', 'rutas-svg');
-    svgOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:all;z-index:400;';
+    svgOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:all;z-index:400;overflow:visible;';
 
     // Definiciones SVG (filtros, gradientes)
     const defs = createSVG('defs', {});
-    // Filtro de sombra para vagones
     const sf = createSVG('filter', { id: 'wShadow', x:'-20%', y:'-20%', width:'140%', height:'160%' });
     sf.appendChild(createSVG('feOffset', { in:'SourceAlpha', dx:0, dy:1.5, result:'o' }));
     sf.appendChild(createSVG('feGaussianBlur', { in:'o', stdDeviation:1.5, result:'b' }));
     sf.appendChild(createSVG('feBlend', { in:'SourceGraphic', in2:'b', mode:'normal' }));
     defs.appendChild(sf);
 
-    // Gradientes de vagones por color de jugador
     for (const [pc, [lt, dk]] of Object.entries(WAGON_GRADS)) {
       const g = createSVG('linearGradient', { id:`wg_${pc}`, x1:'0',y1:'0',x2:'0',y2:'1' });
       g.appendChild(createSVG('stop', { offset:'0%', 'stop-color':lt }));
@@ -209,29 +208,27 @@
     }
     svgOverlay.appendChild(defs);
 
-    leafletMap.getPanes().overlayPane.appendChild(svgOverlay);
+    // Añadir SVG al contenedor del mapa (encima de Leaflet)
+    container.appendChild(svgOverlay);
 
-    // Renderizar rutas y ciudades cuando el mapa esté listo
+    // Renderizar cuando el mapa y los tiles estén listos
     leafletMap.whenReady(() => {
+      console.log('[MAP] Leaflet listo, renderizando SVG overlay');
       renderSVGOverlay();
     });
 
-    // Re-renderizar si el mapa cambia de tamaño
     leafletMap.on('resize', () => { renderSVGOverlay(); });
   }
 
   // Renderizar todo el contenido SVG sobre el mapa Leaflet
   function renderSVGOverlay() {
     if (!leafletMap || !svgOverlay) return;
+    console.log('[SVG] renderSVGOverlay llamado, rutas:', ROUTES.length, 'ciudades:', Object.keys(GEO_CITIES).length);
 
     // Limpiar todo excepto <defs>
     const defs = svgOverlay.querySelector('defs');
     svgOverlay.innerHTML = '';
     if (defs) svgOverlay.appendChild(defs);
-
-    // Ajustar posición del SVG al viewport de Leaflet
-    const topLeft = leafletMap.containerPointToLayerPoint([0, 0]);
-    L.DomUtil.setPosition(svgOverlay, topLeft);
 
     // Grupo de rutas
     const routeG = createSVG('g', { id: 'routeGroup' });
