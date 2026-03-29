@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raíles de Europa — Partida</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="game-body">
+
+  <!-- Panel izquierdo: cartas y acciones -->
+  <div class="panel-left" id="panelLeft">
+    <!-- Mazo -->
+    <div class="panel-section">
+      <div class="panel-section-title">Mazo de cartas</div>
+      <div class="deck-area">
+        <div class="deck-card" id="btnDrawDeck">
+          Robar <span class="count" id="deckCount">0</span>
+        </div>
+        <div class="deck-card" id="btnDrawTickets">
+          Billetes <span class="count" id="ticketCount">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cartas visibles -->
+    <div class="panel-section">
+      <div class="panel-section-title">Cartas visibles</div>
+      <div class="face-up-cards" id="faceUpCards"></div>
+    </div>
+
+    <!-- Mi mano -->
+    <div class="panel-section">
+      <div class="panel-section-title">Mi mano</div>
+      <div class="hand-cards" id="handCards"></div>
+    </div>
+
+    <!-- Mis billetes -->
+    <div class="panel-section">
+      <div class="panel-section-title">Mis billetes</div>
+      <div class="tickets-list" id="ticketsList"></div>
+    </div>
+
+    <!-- Estaciones -->
+    <div class="panel-section">
+      <div class="panel-section-title">Estaciones</div>
+      <div id="stationsInfo" style="font-size:0.78rem; color:var(--text-dim)"></div>
+    </div>
+  </div>
+
+  <!-- Mapa central -->
+  <div class="map-container" id="mapContainer">
+    <div class="turn-banner" id="turnBanner">
+      <span class="turn-dot" id="turnDot"></span>
+      <span id="turnText">Esperando...</span>
+    </div>
+    <svg id="mapSvg" viewBox="0 0 900 650" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+
+  <!-- Panel derecho: jugadores, log, chat -->
+  <div class="panel-right">
+    <div class="panel-right-section">
+      <div class="panel-section-title">Jugadores</div>
+      <div class="scoreboard" id="scoreboard"></div>
+    </div>
+
+    <div class="panel-section-title" style="padding:0.5rem 0.8rem 0.3rem; border-bottom:1px solid var(--border)">Historial</div>
+    <div class="log-area" id="logArea"></div>
+
+    <div class="chat-area">
+      <div class="panel-section-title" style="margin-bottom:0.3rem">Chat</div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Escribe..." maxlength="200" autocomplete="off">
+        <button id="btnChat">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal genérico -->
+  <div id="modalOverlay" class="modal-overlay" style="display:none">
+    <div class="modal" id="modalContent"></div>
+  </div>
+
+  <!-- Pantalla de resultados -->
+  <div id="resultsOverlay" class="results-overlay" style="display:none">
+    <div class="results-panel" id="resultsPanel"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="map.js"></script>
+  <script src="gameLogic.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

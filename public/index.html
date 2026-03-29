@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raíles de Europa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="lobby-body">
+  <div class="lobby-container">
+    <div class="lobby-header">
+      <h1 class="game-title">Raíles de Europa</h1>
+      <p class="game-subtitle">Juego de rutas ferroviarias multijugador</p>
+    </div>
+
+    <!-- Pantalla principal -->
+    <div id="mainMenu" class="lobby-panel">
+      <div class="input-group">
+        <label for="playerName">Tu nombre</label>
+        <input type="text" id="playerName" placeholder="Introduce tu nombre" maxlength="20" autocomplete="off">
+      </div>
+      <div class="lobby-buttons">
+        <button id="btnCreate" class="btn btn-primary">Crear Sala</button>
+        <div class="divider"><span>o</span></div>
+        <div class="input-group">
+          <label for="roomCode">Código de sala</label>
+          <input type="text" id="roomCode" placeholder="Ej: ABCD" maxlength="4" autocomplete="off" style="text-transform:uppercase">
+        </div>
+        <button id="btnJoin" class="btn btn-secondary">Unirse a Sala</button>
+      </div>
+    </div>
+
+    <!-- Sala de espera -->
+    <div id="waitingRoom" class="lobby-panel" style="display:none">
+      <div class="room-header">
+        <h2>Sala de Espera</h2>
+        <div class="room-code-display">
+          <span class="label">Código:</span>
+          <span id="displayCode" class="code"></span>
+          <button id="btnCopyCode" class="btn-icon" title="Copiar código">📋</button>
+        </div>
+      </div>
+      <div id="playerList" class="player-list"></div>
+      <div class="waiting-actions">
+        <button id="btnStart" class="btn btn-primary" style="display:none">Iniciar Partida</button>
+        <p id="waitingMsg" class="waiting-msg">Esperando al anfitrión...</p>
+      </div>
+    </div>
+
+    <!-- Mensajes de error -->
+    <div id="errorMsg" class="error-toast" style="display:none"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let isHost = false;
+    let myId = null;
+
+    // Elementos
+    const mainMenu = document.getElementById('mainMenu');
+    const waitingRoom = document.getElementById('waitingRoom');
+    const playerNameInput = document.getElementById('playerName');
+    const roomCodeInput = document.getElementById('roomCode');
+    const displayCode = document.getElementById('displayCode');
+    const playerList = document.getElementById('playerList');
+    const btnStart = document.getElementById('btnStart');
+    const waitingMsg = document.getElementById('waitingMsg');
+    const errorMsg = document.getElementById('errorMsg');
+
+    // Colores de jugadores (visuales)
+    const playerColorMap = {
+      'rojo': '#e74c3c', 'azul': '#3498db', 'verde': '#2ecc71',
+      'amarillo': '#f39c12', 'negro': '#34495e'
+    };
+
+    // Crear sala
+    document.getElementById('btnCreate').addEventListener('click', () => {
+      const name = playerNameInput.value.trim();
+      if (!name) return showError('Escribe tu nombre');
+      socket.emit('createRoom', { name });
+      isHost = true;
+    });
+
+    // Unirse a sala
+    document.getElementById('btnJoin').addEventListener('click', () => {
+      const name = playerNameInput.value.trim();
+      const code = roomCodeInput.value.trim().toUpperCase();
+      if (!name) return showError('Escribe tu nombre');
+      if (!code || code.length !== 4) return showError('Código de sala inválido');
+      socket.emit('joinRoom', { name, code });
+    });
+
+    // Enter para unirse
+    roomCodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('btnJoin').click();
+    });
+
+    // Copiar código
+    document.getElementById('btnCopyCode').addEventListener('click', () => {
+      navigator.clipboard.writeText(displayCode.textContent);
+      document.getElementById('btnCopyCode').textContent = '✓';
+      setTimeout(() => document.getElementById('btnCopyCode').textContent = '📋', 1500);
+    });
+
+    // Iniciar partida
+    btnStart.addEventListener('click', () => {
+      socket.emit('startGame');
+    });
+
+    // --- Eventos del servidor ---
+    socket.on('connect', () => { myId = socket.id; });
+
+    socket.on('roomCreated', (data) => {
+      displayCode.textContent = data.code;
+      mainMenu.style.display = 'none';
+      waitingRoom.style.display = 'block';
+      btnStart.style.display = 'block';
+      waitingMsg.style.display = 'none';
+    });
+
+    socket.on('roomJoined', (data) => {
+      displayCode.textContent = data.code;
+      mainMenu.style.display = 'none';
+      waitingRoom.style.display = 'block';
+      if (!isHost) {
+        btnStart.style.display = 'none';
+        waitingMsg.style.display = 'block';
+      }
+    });
+
+    socket.on('lobbyUpdate', (data) => {
+      playerList.innerHTML = '';
+      data.players.forEach((p, i) => {
+        const div = document.createElement('div');
+        div.className = 'player-item';
+        const dot = document.createElement('span');
+        dot.className = 'player-dot';
+        dot.style.background = playerColorMap[p.color];
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'player-name-lobby';
+        nameSpan.textContent = p.name;
+        if (i === 0) {
+          const badge = document.createElement('span');
+          badge.className = 'host-badge';
+          badge.textContent = 'Anfitrión';
+          nameSpan.appendChild(badge);
+        }
+        if (p.id === myId) {
+          nameSpan.style.fontWeight = '700';
+        }
+        div.appendChild(dot);
+        div.appendChild(nameSpan);
+        playerList.appendChild(div);
+      });
+
+      // Mostrar botón solo al host si hay 2+ jugadores
+      if (isHost) {
+        btnStart.disabled = data.players.length < 2;
+      }
+    });
+
+    socket.on('gameStarted', (data) => {
+      // Guardar datos en sessionStorage y redirigir
+      sessionStorage.setItem('gameData', JSON.stringify(data));
+      window.location.href = 'game.html';
+    });
+
+    socket.on('error', (data) => {
+      showError(data.message);
+    });
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.style.display = 'block';
+      setTimeout(() => { errorMsg.style.display = 'none'; }, 3000);
+    }
+  </script>
+</body>
+</html>
