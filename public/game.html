@@ -6,6 +6,8 @@
   <title>Raíles de Europa — Partida</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="game-body">
@@ -57,7 +59,7 @@
       <span id="turnText">Esperando...</span>
       <button class="btn-help" id="btnHelp" title="Cómo jugar">?</button>
     </div>
-    <svg id="mapSvg" viewBox="0 0 900 650" preserveAspectRatio="xMidYMid meet"></svg>
+    <!-- Mapa Leaflet se crea dinámicamente aquí -->
   </div>
 
   <!-- Panel derecho: jugadores, log, chat -->
