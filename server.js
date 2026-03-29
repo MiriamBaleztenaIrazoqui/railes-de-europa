@@ -397,7 +397,7 @@ io.on('connection', (socket) => {
   // Robar carta del mazo
   socket.on('drawFromDeck', () => {
     const room = getRoom(currentRoom);
-    if (!room || room.state !== 'playing' && room.state !== 'lastRound') return;
+    if (!room || ((room.state !== 'playing' && room.state !== 'lastRound'))) return;
     const player = getCurrentPlayer(room, socket.id);
     if (!player) return;
 
@@ -430,7 +430,7 @@ io.on('connection', (socket) => {
   // Robar carta visible
   socket.on('drawFaceUp', (data) => {
     const room = getRoom(currentRoom);
-    if (!room || room.state !== 'playing' && room.state !== 'lastRound') return;
+    if (!room || (room.state !== 'playing' && room.state !== 'lastRound')) return;
     const player = getCurrentPlayer(room, socket.id);
     if (!player) return;
 
@@ -481,7 +481,7 @@ io.on('connection', (socket) => {
   // Reclamar ruta
   socket.on('claimRoute', (data) => {
     const room = getRoom(currentRoom);
-    if (!room || room.state !== 'playing' && room.state !== 'lastRound') return;
+    if (!room || (room.state !== 'playing' && room.state !== 'lastRound')) return;
     const player = getCurrentPlayer(room, socket.id);
     if (!player) return;
 
@@ -610,7 +610,7 @@ io.on('connection', (socket) => {
   // Robar billetes de destino
   socket.on('drawTickets', () => {
     const room = getRoom(currentRoom);
-    if (!room || room.state !== 'playing' && room.state !== 'lastRound') return;
+    if (!room || (room.state !== 'playing' && room.state !== 'lastRound')) return;
     const player = getCurrentPlayer(room, socket.id);
     if (!player) return;
 
@@ -675,7 +675,7 @@ io.on('connection', (socket) => {
   // Colocar estación
   socket.on('placeStation', (data) => {
     const room = getRoom(currentRoom);
-    if (!room || room.state !== 'playing' && room.state !== 'lastRound') return;
+    if (!room || (room.state !== 'playing' && room.state !== 'lastRound')) return;
     const player = getCurrentPlayer(room, socket.id);
     if (!player) return;
 
@@ -768,6 +768,50 @@ io.on('connection', (socket) => {
     io.to(currentRoom).emit('chatUpdate', room.chat.slice(-50));
   });
 
+  // Reconexión desde game.html (el socket.id cambia al navegar entre páginas)
+  socket.on('rejoinGame', (data) => {
+    const code = (data.code || '').toUpperCase();
+    const name = (data.name || '').substring(0, 20);
+    const room = getRoom(code);
+    if (!room) return socket.emit('error', { message: 'Sala no encontrada para rejoin' });
+
+    // Buscar jugador por nombre (el id antiguo ya no sirve)
+    const player = room.players.find(p => p.name === name);
+    if (!player) return socket.emit('error', { message: 'Jugador no encontrado en la sala' });
+
+    const oldId = player.id;
+    console.log(`[REJOIN] ${name} reconectado: ${oldId} → ${socket.id} en sala ${code}`);
+
+    // Actualizar el id del jugador al nuevo socket
+    player.id = socket.id;
+    player.connected = true;
+
+    // Actualizar claimedRoutes que referencian el id antiguo
+    for (const [routeId, ownerId] of Object.entries(room.claimedRoutes)) {
+      if (ownerId === oldId) {
+        room.claimedRoutes[routeId] = socket.id;
+      }
+    }
+
+    // Actualizar pendingTickets si referencia el id antiguo
+    if (room.pendingTickets && room.pendingTickets.playerId === oldId) {
+      room.pendingTickets.playerId = socket.id;
+    }
+
+    currentRoom = code;
+    socket.join(code);
+
+    // Enviar estado completo al jugador reconectado
+    socket.emit('rejoinComplete', {
+      gameState: getPublicGameState(room, socket.id),
+      privateState: getPrivatePlayerState(player),
+      initialTickets: player.pendingInitialTickets || null,
+    });
+
+    // Actualizar a todos los demás
+    broadcastGameState(room);
+  });
+
   // Desconexión
   socket.on('disconnect', () => {
     if (!currentRoom) return;
@@ -794,6 +838,7 @@ io.on('connection', (socket) => {
   // --- Helpers ---
   function getCurrentPlayer(room, socketId) {
     const current = room.players[room.currentPlayer];
+    console.log(`[TURNO] Turno actual: ${room.currentPlayer} (${current ? current.name : '?'}, id=${current ? current.id : '?'}) | Intento de: ${socketId}`);
     if (current && current.id === socketId) return current;
     socket.emit('error', { message: 'No es tu turno' });
     return null;

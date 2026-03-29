@@ -700,6 +700,35 @@ input[type="text"]::placeholder {
   box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
+.btn-help {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid var(--accent-dark);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 0 var(--accent-dark);
+  transition: all 0.15s;
+  margin-left: 0.3rem;
+  font-family: var(--font-body);
+}
+
+.btn-help:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 4px rgba(0,0,0,0.12);
+}
+
+.btn-help:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
 /* --- Panel derecho (jugadores, log, chat) --- */
 .panel-right {
   width: 260px;

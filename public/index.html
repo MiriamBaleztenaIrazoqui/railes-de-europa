@@ -163,8 +163,10 @@
     });
 
     socket.on('gameStarted', (data) => {
-      // Guardar datos en sessionStorage y redirigir
+      // Guardar datos + info de rejoin en sessionStorage y redirigir
       sessionStorage.setItem('gameData', JSON.stringify(data));
+      sessionStorage.setItem('roomCode', displayCode.textContent);
+      sessionStorage.setItem('playerName', playerNameInput.value.trim());
       window.location.href = 'game.html';
     });
 

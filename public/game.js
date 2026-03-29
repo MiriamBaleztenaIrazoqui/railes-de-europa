@@ -27,25 +27,37 @@
     'locomotora': '#8e44ad'
   };
 
+  // Flag para mostrar ayuda automática la primera vez que sea tu turno
+  let helpShownOnce = false;
+
   // --- Inicialización ---
   socket.on('connect', () => {
     myId = socket.id;
+    console.log('[CLIENT] Conectado con socket.id:', myId);
 
-    // Recuperar datos iniciales de sessionStorage
-    const savedData = sessionStorage.getItem('gameData');
-    if (savedData) {
-      const data = JSON.parse(savedData);
-      sessionStorage.removeItem('gameData');
-      gameState = data.gameState;
-      privateState = data.privateState;
+    // Recuperar info de rejoin de sessionStorage
+    const roomCode = sessionStorage.getItem('roomCode');
+    const playerName = sessionStorage.getItem('playerName');
 
-      renderMap();
-      updateUI();
+    if (roomCode && playerName) {
+      // Emitir rejoin para que el servidor actualice nuestro socket.id
+      console.log(`[CLIENT] Enviando rejoin: sala=${roomCode}, nombre=${playerName}`);
+      socket.emit('rejoinGame', { code: roomCode, name: playerName });
+    }
+  });
 
-      // Si hay billetes iniciales, mostrar modal
-      if (data.initialTickets && data.initialTickets.length > 0) {
-        showInitialTicketModal(data.initialTickets);
-      }
+  // Respuesta de rejoin exitoso: el servidor nos envía estado fresco
+  socket.on('rejoinComplete', (data) => {
+    console.log('[CLIENT] Rejoin completado, recibido estado');
+    gameState = data.gameState;
+    privateState = data.privateState;
+
+    renderMap();
+    updateUI();
+
+    // Si hay billetes iniciales pendientes, mostrar modal
+    if (data.initialTickets && data.initialTickets.length > 0) {
+      showInitialTicketModal(data.initialTickets);
     }
   });
 
@@ -113,27 +125,186 @@
     const svg = document.getElementById('mapSvg');
     svg.innerHTML = '';
 
-    // Fondo decorativo — agua
+    // --- Fondo cartográfico estilo mapa antiguo ---
+    const defs = createSVG('defs', {});
+
+    // Gradiente para el océano
+    const oceanGrad = createSVG('radialGradient', {
+      id: 'oceanGradient', cx: '40%', cy: '40%', r: '70%'
+    });
+    const stop1 = createSVG('stop', { offset: '0%', 'stop-color': '#d6eef8' });
+    const stop2 = createSVG('stop', { offset: '100%', 'stop-color': '#b4d8ec' });
+    oceanGrad.appendChild(stop1);
+    oceanGrad.appendChild(stop2);
+    defs.appendChild(oceanGrad);
+
+    // Patrón sutil de cuadrícula cartográfica
+    const gridPat = createSVG('pattern', {
+      id: 'gridPattern', width: 40, height: 40, patternUnits: 'userSpaceOnUse'
+    });
+    const gridLine1 = createSVG('line', {
+      x1: 0, y1: 0, x2: 40, y2: 0,
+      stroke: '#c2dce8', 'stroke-width': 0.3, opacity: 0.5
+    });
+    const gridLine2 = createSVG('line', {
+      x1: 0, y1: 0, x2: 0, y2: 40,
+      stroke: '#c2dce8', 'stroke-width': 0.3, opacity: 0.5
+    });
+    gridPat.appendChild(gridLine1);
+    gridPat.appendChild(gridLine2);
+    defs.appendChild(gridPat);
+    svg.appendChild(defs);
+
+    // Océano de fondo
     const bg = createSVG('rect', {
       x: 0, y: 0, width: 900, height: 650,
-      fill: '#d4eaf7', rx: 0
+      fill: 'url(#oceanGradient)'
     });
     svg.appendChild(bg);
 
-    // Masas de tierra simplificadas
-    const land = createSVG('path', {
-      d: `M60,100 Q100,80 200,90 Q350,60 500,70 Q600,50 700,80
-          Q800,70 860,120 L870,200 Q850,280 830,350 Q820,420 840,500
-          L800,560 Q750,580 680,570 Q650,590 620,580 Q580,600 540,580
-          Q500,620 460,610 Q430,640 380,620 Q320,600 280,580
-          Q220,600 180,580 Q120,600 80,560 Q40,500 50,420
-          Q30,340 40,260 Q50,180 60,100 Z`,
-      fill: '#b8dfc9',
-      opacity: 0.5,
-      stroke: '#9fd4b8',
-      'stroke-width': 1,
+    // Cuadrícula cartográfica sobre el mar
+    const grid = createSVG('rect', {
+      x: 0, y: 0, width: 900, height: 650,
+      fill: 'url(#gridPattern)'
     });
-    svg.appendChild(land);
+    svg.appendChild(grid);
+
+    // Masas de tierra — polígonos de Europa simplificados
+    const landGroup = createSVG('g', { id: 'landMasses' });
+
+    // Escandinavia / Norte
+    const scandinavia = createSVG('path', {
+      d: `M430,20 L460,25 Q490,30 510,55 L520,80 Q525,100 510,120
+          L490,130 Q470,105 455,80 Q440,55 430,20 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(scandinavia);
+
+    // Islas Británicas
+    const britain = createSVG('path', {
+      d: `M165,95 Q175,85 195,90 L210,105 Q225,115 230,140
+          L240,170 Q250,195 245,215 L235,230 Q220,240 205,235
+          L190,220 Q180,200 175,175 Q170,150 168,125 L165,95 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(britain);
+
+    // Irlanda
+    const ireland = createSVG('path', {
+      d: `M140,145 Q150,135 165,140 L170,160 Q172,175 165,185
+          L155,190 Q142,185 138,170 L140,145 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(ireland);
+
+    // Europa continental principal
+    const continental = createSVG('path', {
+      d: `M230,220 Q260,210 290,205 L340,195 Q380,185 420,190
+          L480,185 Q530,175 580,165 L640,145 Q680,130 720,115
+          L760,105 Q800,100 840,115 L870,140 Q880,170 870,210
+          L860,260 Q850,300 840,340 L830,380 Q825,410 840,440
+          L850,470 Q845,500 820,510 L790,500 Q760,490 740,470
+          L720,460 Q700,455 680,460 L660,470 Q640,490 620,510
+          L600,530 Q580,540 560,535 L540,520 Q520,500 500,490
+          L480,480 Q460,475 440,480 L420,490 Q400,500 380,495
+          L360,480 Q340,470 320,460 L300,450 Q280,440 260,430
+          L240,420 Q220,400 210,375 L200,345 Q195,315 200,285
+          L210,260 Q220,240 230,220 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(continental);
+
+    // Península Ibérica
+    const iberia = createSVG('path', {
+      d: `M50,430 Q60,400 80,380 L110,370 Q140,365 170,370
+          L210,380 Q240,385 265,400 L285,420 Q295,440 290,465
+          L280,490 Q270,515 250,530 L220,540 Q190,550 160,545
+          L130,535 Q100,525 80,510 L60,490 Q45,465 50,430 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(iberia);
+
+    // Italia
+    const italy = createSVG('path', {
+      d: `M380,390 Q390,400 400,420 L410,445 Q420,470 430,490
+          L440,515 Q445,535 440,555 L435,570 Q425,580 415,575
+          L405,560 Q400,540 405,520 L400,500 Q390,480 380,460
+          L370,435 Q365,415 370,400 L380,390 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(italy);
+
+    // Sicilia
+    const sicily = createSVG('path', {
+      d: `M400,580 Q415,570 430,575 L440,585 Q435,600 420,605
+          L405,600 Q395,590 400,580 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(sicily);
+
+    // Grecia / Balcanes sur
+    const greece = createSVG('path', {
+      d: `M580,470 Q590,480 600,500 L610,520 Q615,540 605,555
+          L595,560 Q585,550 580,535 L575,510 Q572,490 580,470 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(greece);
+
+    // Turquía / Anatolia
+    const turkey = createSVG('path', {
+      d: `M680,410 Q710,405 740,410 L780,420 Q810,430 840,445
+          L860,460 Q870,475 860,490 L840,500 Q810,510 780,505
+          L750,500 Q720,495 700,485 L680,470 Q670,450 680,410 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(turkey);
+
+    // Rusia (parte visible)
+    const russia = createSVG('path', {
+      d: `M620,30 Q660,20 700,25 L750,40 Q800,55 840,80
+          L870,110 Q890,140 880,180 L870,210 Q860,180 840,160
+          L810,140 Q780,130 750,125 L710,120 Q680,118 650,110
+          L630,95 Q615,75 620,50 L620,30 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.7
+    });
+    landGroup.appendChild(russia);
+
+    // Norte de África (decorativo, borde inferior)
+    const africa = createSVG('path', {
+      d: `M0,620 Q50,600 120,610 L200,615 Q300,610 400,620
+          L500,625 Q600,620 700,630 L800,635 Q870,630 900,640
+          L900,650 L0,650 Z`,
+      fill: '#e8dcc8', stroke: '#d4c4a8', 'stroke-width': 0.8, opacity: 0.5
+    });
+    landGroup.appendChild(africa);
+
+    svg.appendChild(landGroup);
+
+    // Líneas de latitud/longitud decorativas (más visibles sobre tierra)
+    const decoGroup = createSVG('g', { opacity: 0.15 });
+    for (let lat = 100; lat < 650; lat += 100) {
+      const latLine = createSVG('line', {
+        x1: 0, y1: lat, x2: 900, y2: lat,
+        stroke: '#8ba59a', 'stroke-width': 0.4, 'stroke-dasharray': '8 4'
+      });
+      decoGroup.appendChild(latLine);
+    }
+    for (let lon = 100; lon < 900; lon += 100) {
+      const lonLine = createSVG('line', {
+        x1: lon, y1: 0, x2: lon, y2: 650,
+        stroke: '#8ba59a', 'stroke-width': 0.4, 'stroke-dasharray': '8 4'
+      });
+      decoGroup.appendChild(lonLine);
+    }
+    svg.appendChild(decoGroup);
+
+    // Rosa de los vientos decorativa (esquina inferior izquierda)
+    const compass = createSVG('text', {
+      x: 30, y: 635, 'font-size': '14px', fill: '#b8a88c',
+      'font-family': 'serif', 'font-style': 'italic', opacity: 0.6
+    });
+    compass.textContent = '🧭 N';
+    svg.appendChild(compass);
 
     // Grupo de rutas (debajo de ciudades)
     const routeGroup = createSVG('g', { id: 'routeGroup' });
@@ -391,6 +562,11 @@
     if (current.id === myId) {
       text.textContent = '¡Tu turno!';
       banner.classList.add('your-turn-glow');
+      // Mostrar ayuda automáticamente la primera vez que sea tu turno
+      if (!helpShownOnce && !gameState.turnPhase) {
+        helpShownOnce = true;
+        showHelpModal();
+      }
     } else {
       text.textContent = `Turno de ${current.name}`;
       banner.classList.remove('your-turn-glow');
@@ -595,6 +771,9 @@
   document.getElementById('btnDrawTickets').addEventListener('click', () => {
     socket.emit('drawTickets');
   });
+
+  // Botón de ayuda
+  document.getElementById('btnHelp').addEventListener('click', showHelpModal);
 
   // Chat
   document.getElementById('btnChat').addEventListener('click', sendChat);
@@ -809,6 +988,54 @@
     socket.emit('placeStation', { city: cityName, option });
     hideModal();
   };
+
+  // --- Popup de ayuda "Cómo jugar" ---
+  function showHelpModal() {
+    showModal(`
+      <h3>Como jugar tu turno</h3>
+      <div style="font-size:0.85rem; line-height:1.6; color:var(--text)">
+
+        <p style="margin-bottom:0.8rem; color:var(--text-dim)">En tu turno debes elegir <strong>UNA</strong> de estas acciones:</p>
+
+        <div style="background:var(--bg-card); border:2px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
+          <strong style="color:var(--sky)">🃏 ROBAR CARTAS DE VAGON</strong><br>
+          Coge 2 cartas: del mazo (ciegas) o de las 5 cartas visibles.<br>
+          Si coges una Locomotora visible, solo puedes coger esa (cuenta como 2).<br>
+          Las locomotoras son comodin para cualquier color.
+        </div>
+
+        <div style="background:var(--bg-card); border:2px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
+          <strong style="color:var(--accent)">🚂 RECLAMAR UNA RUTA</strong><br>
+          Haz clic en una ruta del mapa para reclamarla.<br>
+          Necesitas tantas cartas del color de la ruta como segmentos tenga.<br>
+          Las rutas grises aceptan cualquier color (todos iguales).<br>
+          Rutas con ⚓ (ferry): requieren locomotoras + cartas del color.<br>
+          Rutas con ⛰ (tunel): pueden requerir cartas extra (se revelan 3 del mazo).
+        </div>
+
+        <div style="background:var(--bg-card); border:2px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
+          <strong style="color:var(--gold)">🎫 ROBAR BILLETES DE DESTINO</strong><br>
+          Roba 3 billetes y quedate al menos 1.<br>
+          Completar un billete da puntos; no completarlo resta puntos.
+        </div>
+
+        <div style="background:var(--bg-card); border:2px solid var(--border); border-radius:var(--radius-sm); padding:0.7rem; margin-bottom:0.5rem">
+          <strong style="color:var(--pink)">🏠 COLOCAR ESTACION</strong> (opcional)<br>
+          Haz clic en una ciudad para colocar una estacion.<br>
+          Te permite usar UNA ruta adyacente de otro jugador.<br>
+          Cada estacion no usada al final da 4 puntos extra.
+        </div>
+
+        <p style="margin-top:0.8rem; color:var(--text-dim); font-size:0.8rem">
+          <strong>Fin del juego:</strong> cuando un jugador tiene ≤2 trenes, se juega una ronda mas.
+          Gana quien tenga mas puntos (rutas + billetes + estaciones + ruta mas larga).
+        </p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="hideModalGlobal()">Entendido</button>
+      </div>
+    `);
+  }
 
   function showInfoModal(title, message) {
     showModal(`
