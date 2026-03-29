@@ -198,7 +198,9 @@
     // Así usamos containerPoint y no hay offset de panes
     svgOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svgOverlay.setAttribute('id', 'rutas-svg');
-    svgOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:all;z-index:400;overflow:visible;';
+    // pointer-events:none en el SVG para que Leaflet reciba drag/zoom
+    // Los elementos interactivos (rutas, ciudades) tienen pointer-events:all individualmente
+    svgOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:400;overflow:visible;';
 
     // Definiciones SVG (filtros, gradientes)
     const defs = createSVG('defs', {});
@@ -239,16 +241,16 @@
     svgOverlay.innerHTML = '';
     if (defs) svgOverlay.appendChild(defs);
 
-    // Grupo de rutas
-    const routeG = createSVG('g', { id: 'routeGroup' });
+    // Grupo de rutas — pointer-events:all para que sean clicables
+    const routeG = createSVG('g', { id: 'routeGroup', 'pointer-events': 'all' });
     svgOverlay.appendChild(routeG);
 
     // Grupo de estaciones
     const stationG = createSVG('g', { id: 'stationGroup' });
     svgOverlay.appendChild(stationG);
 
-    // Grupo de ciudades
-    const cityG = createSVG('g', { id: 'cityGroup' });
+    // Grupo de ciudades — pointer-events:all para clic en estaciones
+    const cityG = createSVG('g', { id: 'cityGroup', 'pointer-events': 'all' });
     svgOverlay.appendChild(cityG);
 
     // Dibujar rutas

@@ -196,7 +196,9 @@ input[type="text"]::placeholder { color: var(--text-muted); }
 
 /* Leaflet overrides */
 #leaflet-map { z-index:1; }
-#rutas-svg { z-index:400 !important; }
+#rutas-svg { z-index:400 !important; pointer-events:none !important; }
+/* Controles de Leaflet (zoom, atribución) por encima del SVG */
+.leaflet-control-container { z-index:500 !important; position:relative; }
 .leaflet-control-attribution { font-size:9px !important; opacity:0.6; }
 
 .city-dot {
